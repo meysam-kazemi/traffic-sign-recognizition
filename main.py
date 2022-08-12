@@ -67,7 +67,7 @@ plt.show()
 
 
 # =============================================================================
-# Catego
+# Categoricalizing
 # =============================================================================
 Ytrain = tf.keras.utils.to_categorical(Ytrain,43)
 Ytest = tf.keras.utils.to_categorical(Ytest,43)
