@@ -14,6 +14,9 @@ import PIL
 # =============================================================================
 path="./German-Traffic-Signs-Dataset-GTSRB-master/"
    
+cs = pd.read_csv(path+"Test.csv")
+
+
 # Create a function that load the data
 def load_images(csv_file_name,path=path):
     """csv_file_name --> The name of The csv file that we want to open it\n
@@ -67,34 +70,49 @@ plt.show()
 
 
 # =============================================================================
-# Categoricalizing
+# Catego
 # =============================================================================
 Ytrain = tf.keras.utils.to_categorical(Ytrain,43)
 Ytest = tf.keras.utils.to_categorical(Ytest,43)
 
+
+# validation data
+from sklearn.model_selection import train_test_split
+Xtrain,Xval,Ytrain,Yval=train_test_split(Xtrain,Ytrain,train_size=0.8,random_state=24)
+
+
 # =============================================================================
-# Creating a Model
+# Build a Model
 # =============================================================================
+
+from tensorflow.keras import regularizers
 
 # Create a Sequential model
 model = tf.keras.models.Sequential()
-# Add a convolutional layer with 16 filters
-model.add(Conv2D(16, (3,3),activation="relu",input_shape=(30,30,3)))
+# Add a convolutional layer with 4 filters
+model.add(Conv2D(4, (3,3),activation="relu",input_shape=(30,30,3),
+    kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4),
+    bias_regularizer=regularizers.L2(1e-4),
+    activity_regularizer=regularizers.L2(1e-5)))
 model.add(MaxPooling2D((2,2)))
-model.add(Dropout(0.2))
+# model.add(Dropout(0.4))
 
-# Add a convolutional layer with 32 filters
-model.add(Conv2D(32,(3,3),activation="relu"))
+# Add a convolutional layer with 4 filters
+model.add(Conv2D(4,(3,3),activation="relu",
+    kernel_regularizer=regularizers.L1L2(l1=1e-3, l2=1e-3)))
 model.add(MaxPooling2D((2,2)))
-model.add(Dropout(0.2))
+# model.add(Dropout(0.4))
 
 model.add(tf.keras.layers.Flatten())
 # Add a linear layer with 128 neurons and relu activation function
-model.add(Dense(128,activation="relu"))
-model.add(Dropout(0.2))
+model.add(Dense(128,activation="relu",
+    kernel_regularizer=regularizers.L1L2(l1=1e-3, l2=1e-3)))
+# model.add(Dropout(0.4))
 # Add a linear layer with 128 neurons and relu activation function
-model.add(Dense(64,activation="relu"))
-model.add(Dropout(0.2))
+model.add(Dense(64,activation="relu",
+    kernel_regularizer=regularizers.L1L2(l1=1e-3, l2=1e-3)))
+model.add(Dropout(0.4))
+
 # Add Output layer with softmax activation function
 model.add(Dense(len(sign_names),activation="softmax"))
 
@@ -107,7 +125,90 @@ model.compile(
     optimizer="adam",
     metrics=[recall,"acc"]
              )
-model.fit(Xtrain,Ytrain,epochs=15,validation_split=0.2)
+# hist = model.fit(Xtrain,Ytrain,epochs=15,validation_data=(Xval,Yval))
 
-model.evaluate(Xtest,Ytest)
+
+"""I trained the model and saved it.
+I also saved the history in CSV format because it takes time to run the model"""
+# =============================================================================
+# Load the saved mdoel
+# =============================================================================
+model = tf.keras.models.load_model("./mymodel.h5")
+history = pd.read_csv("history.csv")
+
+print("evaluate: ",model.evaluate(Xtest,Ytest))
+
+# =============================================================================
+# Validation curve
+# =============================================================================
+
+# history = hist.history
+
+plt.figure(figsize=(17,4))
+plt.title("Validation Curve")
+
+# The diagram of accuracy-epochs 
+plt.subplot(1,3,1)
+plt.plot(history["acc"],c="blue",label="accuracy")
+plt.plot(history["val_acc"],c="green",label="val_accuracy")
+# plt.ylim(0,1)
+plt.legend(loc="upper right")
+plt.xlabel("epochs")
+plt.ylabel("accuracy")
+
+# The diagram of recall-epochs
+plt.subplot(1,3,2)
+plt.plot(history["recall"],c="yellow",label="recall")
+plt.plot(history["val_recall"],c="orange",label="val_recall")
+plt.legend(loc="upper right")
+plt.xlabel("epochs")
+plt.ylabel("recall")
+
+# The diagram of loss-epochs
+plt.subplot(1,3,3)
+plt.plot(history["loss"],c="red",label="loss")
+plt.plot(history["val_loss"],c="orange",label="val_loss")
+plt.legend(loc="upper right")
+plt.xlabel("epochs")
+plt.ylabel("loss")
+
+plt.savefig("validation curve.png")
+plt.show()
+
+
+
+# =============================================================================
+# Predict Xtest's classes
+# =============================================================================
+pred = model.predict(Xtest)
+pred = np.argmax(pred,axis=1)
+pred 
+
+Ytest = np.argmax(Ytest,axis=1) 
+
+print(f"ture classes for Xtest:{Ytest[:10]}")
+print("==========================")
+print(f"Predicted classes for Xtest:{pred[:10]}")
+
+print(f"accuracy of model: {round(np.sum(Ytest==pred)/len(pred)*100,2)}%")
+# =============================================================================
+# View samples of the test data
+# =============================================================================
+plt.figure(figsize=(7,7))
+rand = np.random.randint(len(Xtest),size=(6,))
+for i,image in enumerate(Xtest[rand]):
+    plt.subplot(3,2,i+1)
+    plt.imshow(image)
+    pred_class = sign_names.SignName[pred[rand[i]]]
+    true_class = sign_names.SignName[Ytest[rand[i]]]
+    plt.title(pred_class if pred_class==true_class else f"{pred_class}\ntrue :{true_class}",
+              color="green" if pred_class==true_class else "red")
+    plt.axis("off")
+plt.show()
+
+
+
+
+
+
     
